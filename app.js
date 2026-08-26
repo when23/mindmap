@@ -564,6 +564,7 @@ function handleNav(action) {
     case 'exportSVG': exportSVG(); break;
     case 'exportPNG': exportPNG(); break;
     case 'importJSON': document.getElementById('fileInput').click(); break;
+    case 'exportJSON': exportJSON(); break;
     case 'reset':
       if (confirm('确定清空当前脑图的所有节点吗？')) {
         mind = { id: nid(), text: '中心主题', fontSize: 18, bold: true, color: '#ffffff', collapsed: false, children: [] };
@@ -679,6 +680,15 @@ function exportPNG() {
     }, 'image/png');
   };
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/* 导出当前脑图为 JSON 文件（与“导入 JSON”对称，形成备份闭环） */
+function exportJSON() {
+  const map = getCurrentMap();
+  const blob = new Blob([JSON.stringify(map.data, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  download(url, (map.title || 'mindmap') + '.json');
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* ---------- 启动 ---------- */
