@@ -264,6 +264,23 @@ function render() {
 
   const visible = collectVisible(mind);
 
+  // 居中布局：把中心主题放到画布左侧约 22%、垂直居中，避免内容偏顶/偏边
+  const wrap = document.getElementById('canvasWrap');
+  const minX = Math.min(...visible.map(n => n._x));
+  const maxX = Math.max(...visible.map(n => n._x));
+  const minY = Math.min(...visible.map(n => n._y));
+  const maxY = Math.max(...visible.map(n => n._y));
+  const availW = wrap.clientWidth || 800;
+  const availH = wrap.clientHeight || 600;
+  let sx, sy;
+  const contentW = (maxX - minX) + 320;
+  const contentH = (maxY - minY) + 44;
+  if (contentW <= availW) sx = Math.max(PAD_LEFT - minX, Math.round(availW * 0.22) - mind._x);
+  else sx = PAD_LEFT - minX;
+  if (contentH <= availH) sy = (availH - contentH) / 2 - minY;
+  else sy = PAD_TOP - minY;
+  visible.forEach(n => { n._x += sx; n._y += sy; });
+
   visible.forEach(n => {
     const div = document.createElement('div');
     div.className = 'node' + (isRoot(n.id) ? ' root' : '') + (n.id === selectedId ? ' selected' : '');
