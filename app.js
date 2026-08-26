@@ -265,21 +265,24 @@ function render() {
   const visible = collectVisible(mind);
 
   // 居中布局：把中心主题放到画布左侧约 22%、垂直居中，避免内容偏顶/偏边
+  // 首屏布局未稳时 wrap 尺寸可能为 0，此时跳过居中（保留 PAD 起始），
+  // 待 requestAnimationFrame / window.load 重新渲染时再居中，避免刷新后位置错乱
   const wrap = document.getElementById('canvasWrap');
-  const minX = Math.min(...visible.map(n => n._x));
-  const maxX = Math.max(...visible.map(n => n._x));
-  const minY = Math.min(...visible.map(n => n._y));
-  const maxY = Math.max(...visible.map(n => n._y));
-  const availW = wrap.clientWidth || 800;
-  const availH = wrap.clientHeight || 600;
-  let sx, sy;
-  const contentW = (maxX - minX) + 320;
-  const contentH = (maxY - minY) + 44;
-  if (contentW <= availW) sx = Math.max(PAD_LEFT - minX, Math.round(availW * 0.22) - mind._x);
-  else sx = PAD_LEFT - minX;
-  if (contentH <= availH) sy = (availH - contentH) / 2 - minY;
-  else sy = PAD_TOP - minY;
-  visible.forEach(n => { n._x += sx; n._y += sy; });
+  const availW = wrap.clientWidth, availH = wrap.clientHeight;
+  if (availW && availH) {
+    const minX = Math.min(...visible.map(n => n._x));
+    const maxX = Math.max(...visible.map(n => n._x));
+    const minY = Math.min(...visible.map(n => n._y));
+    const maxY = Math.max(...visible.map(n => n._y));
+    let sx, sy;
+    const contentW = (maxX - minX) + 320;
+    const contentH = (maxY - minY) + 44;
+    if (contentW <= availW) sx = Math.max(PAD_LEFT - minX, Math.round(availW * 0.22) - mind._x);
+    else sx = PAD_LEFT - minX;
+    if (contentH <= availH) sy = (availH - contentH) / 2 - minY;
+    else sy = PAD_TOP - minY;
+    visible.forEach(n => { n._x += sx; n._y += sy; });
+  }
 
   visible.forEach(n => {
     const div = document.createElement('div');
@@ -634,3 +637,8 @@ function exportPNG() {
 bindEvents();
 renderList();
 render();
+// 布局稳定后（CSS/字体/滚动条就绪）再渲染一次，确保居中准确，避免刷新后位置错乱
+requestAnimationFrame(() => render());
+window.addEventListener('load', () => render());
+// 窗口尺寸变化时重新居中
+window.addEventListener('resize', () => render());
