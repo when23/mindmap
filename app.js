@@ -390,7 +390,7 @@ function renderList() {
     item.className = 'map-item' + (m.id === currentId ? ' active' : '');
     item.dataset.id = m.id;
 
-    const ico = document.createElement('span'); ico.className = 'map-ico'; ico.textContent = '🧠';
+    const ico = document.createElement('span'); ico.className = 'map-ico'; ico.textContent = '📁';
     const name = document.createElement('span'); name.className = 'map-name'; name.textContent = m.title;
     const del = document.createElement('span'); del.className = 'map-del'; del.textContent = '×'; del.title = '删除';
     item.append(ico, name, del);
