@@ -10,6 +10,7 @@
 const STORAGE_KEY = 'my-mindmaps-v2';
 const FONT_DEFAULT = 15;
 const H_GAP = 240, V_GAP = 74;
+const PAD_TOP = 70, PAD_LEFT = 70; // 内容区留白，避免第一行节点被顶部工具栏遮挡
 
 let idCounter = 1;
 const nid = () => 'n' + (idCounter++);
@@ -243,9 +244,9 @@ function applySearchHighlight() {
 
 /* ---------- 布局与渲染 ---------- */
 function computeLayout(root) {
-  let nextY = 0;
+  let nextY = PAD_TOP;
   const assign = (node, depth) => {
-    node._x = depth * H_GAP + 40;
+    node._x = depth * H_GAP + PAD_LEFT;
     if (!hasChildren(node) || node.collapsed) { node._y = nextY; nextY += V_GAP; }
     else {
       node.children.forEach(c => assign(c, depth + 1));
