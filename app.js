@@ -288,8 +288,12 @@ function render() {
       div.appendChild(t);
     }
 
-    // 双击节点文字 → 内联编辑
-    txt.addEventListener('dblclick', e => { e.stopPropagation(); enterEdit(n, txt, div); });
+    // 双击节点任意位置 → 内联编辑（折叠开关除外）
+    div.addEventListener('dblclick', e => {
+      if (e.target.classList.contains('toggle')) return;
+      e.stopPropagation();
+      enterEdit(n, txt, div);
+    });
 
     nodesEl.appendChild(div);
   });
@@ -356,6 +360,13 @@ function enterEdit(node, txtEl, divEl) {
   txtEl.addEventListener('keydown', onKey);
 }
 
+/* ---------- 节点选中（轻量，不重建 DOM，避免打断双击） ---------- */
+function selectNode(id) {
+  selectedId = id;
+  document.querySelectorAll('.node').forEach(n => n.classList.toggle('selected', n.dataset.id === id));
+  syncToolbar();
+}
+
 /* ---------- 工具栏同步 ---------- */
 function syncToolbar() {
   const node = findNode(mind, selectedId) || mind;
@@ -405,16 +416,18 @@ function renderList() {
 function bindEvents() {
   document.getElementById('btnNewMap').onclick = newMap;
 
-  // 选中节点
+  // 选中节点（轻量：只切样式、不重建 DOM，避免打断双击编辑）
   document.getElementById('nodes').addEventListener('click', e => {
     const el = e.target.closest('.node'); if (!el) return;
     if (e.target.classList.contains('toggle')) return;
-    selectedId = el.dataset.id; render();
+    if (e.target.isContentEditable) return;
+    selectNode(el.dataset.id);
   });
 
   // 拖拽换父级
   const nodesEl = document.getElementById('nodes');
   nodesEl.addEventListener('dragstart', e => {
+    if (e.target.isContentEditable) { e.preventDefault(); return; }
     const el = e.target.closest('.node'); if (!el) return;
     if (e.target.classList && e.target.classList.contains('toggle')) { e.preventDefault(); return; }
     dragId = el.dataset.id;
