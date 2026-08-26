@@ -521,10 +521,18 @@ function bindEvents() {
   // 导航动作
   document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => handleNav(btn.dataset.action)));
 
+  // 操作说明弹窗：关闭交互（点遮罩 / 关闭按钮 / Esc）
+  const helpModal = document.getElementById('helpModal');
+  helpModal.addEventListener('click', e => { if (e.target === helpModal) closeHelp(); });
+  document.getElementById('helpClose').addEventListener('click', closeHelp);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && helpModal.classList.contains('open')) closeHelp(); });
+
   // 快捷键
   document.addEventListener('keydown', e => {
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+    // 操作说明弹窗打开时，不触发画布快捷键，避免误编辑
+    if (document.getElementById('helpModal').classList.contains('open')) return;
     if (e.key === 'Tab') { e.preventDefault(); addChild(selectedId); }
     else if (e.key === 'Enter') { e.preventDefault(); addSibling(selectedId); }
     else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteNode(selectedId); }
@@ -562,8 +570,48 @@ function handleNav(action) {
         selectedId = mind.id; render();
       }
       break;
+    case 'help': openHelp(); break;
   }
 }
+
+/* ---------- 操作说明弹窗 ---------- */
+// 想新增说明时，只需往下面的 HELP_GROUPS 数组里加条目即可（keys 为快捷键/按键数组，desc 为说明）
+const HELP_GROUPS = [
+  { title: '键盘快捷键', items: [
+    { keys: ['Tab'], desc: '为选中节点插入下级主题' },
+    { keys: ['Enter'], desc: '为选中节点插入同级主题' },
+    { keys: ['Delete'], desc: '删除选中节点' },
+    { keys: ['Backspace'], desc: '删除选中节点' },
+    { keys: ['Alt', '↑'], desc: '上移节点' },
+    { keys: ['Alt', '↓'], desc: '下移节点' },
+  ]},
+  { title: '节点编辑中', items: [
+    { keys: ['Enter'], desc: '完成编辑' },
+    { keys: ['Esc'], desc: '取消编辑' },
+    { keys: ['Shift', 'Enter'], desc: '换行（不结束编辑）' },
+  ]},
+  { title: '鼠标操作', items: [
+    { keys: ['单击'], desc: '选中节点' },
+    { keys: ['双击'], desc: '编辑节点文字' },
+    { keys: ['拖拽'], desc: '把节点拖到另一个节点上，设为它的子节点' },
+    { keys: ['＋/－'], desc: '点击节点右侧圆点，折叠 / 展开子节点' },
+  ]},
+];
+function openHelp() {
+  const modal = document.getElementById('helpModal');
+  const body = document.getElementById('helpBody');
+  body.innerHTML = HELP_GROUPS.map(g => `
+    <div class="help-group">
+      <div class="help-group-title">${g.title}</div>
+      ${g.items.map(it => `
+        <div class="help-row">
+          <span class="help-keys">${it.keys.map(k => `<kbd>${k}</kbd>`).join('')}</span>
+          <span class="help-desc">${it.desc}</span>
+        </div>`).join('')}
+    </div>`).join('');
+  modal.classList.add('open');
+}
+function closeHelp() { document.getElementById('helpModal').classList.remove('open'); }
 
 /* ---------- Toast ---------- */
 function toast(msg) {
