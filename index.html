@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我的脑图主页</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 左侧导航栏 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">🧠</div>
+      <div class="brand-text">
+        <div class="brand-name">我的脑图</div>
+        <div class="brand-sub">个人主页 · 思维整理</div>
+      </div>
+    </div>
+
+    <button id="btnNewMap" class="new-map-btn">＋ 新建脑图</button>
+
+    <div class="list-title">脑图列表 <span id="mapCount" class="map-count"></span></div>
+    <div class="map-list" id="mapList"></div>
+
+    <div class="nav-footer">
+      <div class="hint">操作</div>
+      <div class="footer-actions">
+        <button class="nav-item" data-action="exportSVG"><span class="nav-ico">🖼️</span> 导出 SVG</button>
+        <button class="nav-item" data-action="exportPNG"><span class="nav-ico">📷</span> 导出 PNG</button>
+        <button class="nav-item" data-action="importJSON"><span class="nav-ico">📂</span> 导入 JSON</button>
+        <button class="nav-item" data-action="reset"><span class="nav-ico">♻️</span> 清空当前</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 右侧工作区 -->
+  <main class="main">
+    <header class="toolbar">
+      <div class="tb-group">
+        <input id="txtTitle" class="tb-title" type="text" placeholder="脑图标题…" />
+      </div>
+
+      <div class="tb-divider"></div>
+
+      <div class="tb-group">
+        <button id="btnChild" class="tb-btn primary" title="插入下级主题">＋下级</button>
+        <button id="btnParent" class="tb-btn" title="插入上级主题">＋上级</button>
+        <button id="btnSibling" class="tb-btn" title="插入同级主题">＋同级</button>
+        <button id="btnUp" class="tb-btn" title="上移">↑上移</button>
+        <button id="btnDown" class="tb-btn" title="下移">↓下移</button>
+        <button id="btnDelete" class="tb-btn danger" title="删除节点">🗑删除</button>
+        <button id="btnCopy" class="tb-btn" title="复制选中子树">⧉复制</button>
+        <button id="btnPaste" class="tb-btn" title="粘贴子树到选中节点下">⧉粘贴</button>
+      </div>
+
+      <div class="tb-divider"></div>
+
+      <div class="tb-group style-group">
+        <div class="search-wrap">
+          <input id="txtSearch" class="tb-search" type="text" placeholder="🔍 搜索节点…" />
+          <div id="searchResults" class="search-results"></div>
+        </div>
+        <input id="txtText" class="tb-text" type="text" placeholder="选中节点后编辑内容（也可双击节点直接改）" />
+        <label class="tb-field">字号
+          <input id="rngSize" type="range" min="12" max="48" step="1" value="15" />
+          <span id="sizeVal" class="tb-num">15</span>
+        </label>
+        <button id="btnBold" class="tb-btn" title="加粗/取消加粗">B</button>
+        <label class="tb-field">颜色
+          <input id="colColor" type="color" value="#2b6cff" />
+        </label>
+      </div>
+    </header>
+
+    <section class="canvas-wrap" id="canvasWrap">
+      <svg id="links" class="links"></svg>
+      <div id="nodes" class="nodes"></div>
+    </section>
+  </main>
+
+  <input type="file" id="fileInput" accept="application/json" hidden />
+  <script src="app.js"></script>
+</body>
+</html>
