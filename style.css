@@ -347,6 +347,8 @@ body {
 }
 .search-result:hover { background: #eef3ff; color: var(--accent); }
 .search-empty { padding: 9px; font-size: 12px; color: #999; text-align: center; }
+/* 搜索结果框为空时不占位，避免出现空白条 */
+.search-results:empty { display: none; }
 
 /* Toast 提示 */
 .toast {
