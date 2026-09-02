@@ -61,6 +61,7 @@ let mind = getCurrentMap().data;
 let selectedId = mind.id;
 let dragId = null;          // 拖拽中的节点 id
 let clipboard = null;       // 复制的子树（深拷贝）
+let undoStack = [];       // 撤回栈（保存 mind 历史快照）
 let searchQuery = '';
 let wasSearching = false;
 let collapsedSnap = {};
@@ -71,6 +72,7 @@ function persistCurrent() { const m = getCurrentMap(); m.data = mind; m.updatedA
 /* ---------- 脑图列表操作 ---------- */
 function setCurrent(id) {
   if (id === currentId) return;
+  undoStack.length = 0;
   persistCurrent();
   currentId = id;
   mind = getCurrentMap().data;
@@ -81,12 +83,14 @@ function setCurrent(id) {
   renderList(); render();
 }
 function newMap() {
+  undoStack.length = 0;
   persistCurrent();
   const m = { id: 'm' + Date.now(), title: '未命名脑图 ' + (maps.length + 1), data: defaultData(), updatedAt: Date.now() };
   maps.push(m); currentId = m.id; mind = m.data; selectedId = mind.id;
   saveMaps(); renderList(); render();
 }
 function deleteMap(id) {
+  undoStack.length = 0;
   const idx = maps.findIndex(m => m.id === id);
   if (idx < 0) return;
   if (!confirm(`确定删除脑图「${maps[idx].title}」吗？此操作不可恢复。`)) return;
@@ -120,23 +124,40 @@ function isWithin(subtreeRoot, id) {
   return subtreeRoot.children.some(c => isWithin(c, id));
 }
 
+/* ---------- 撤回（undo） ---------- */
+function pushUndo(snap) {
+  undoStack.push(snap || JSON.parse(JSON.stringify(mind)));
+  if (undoStack.length > 60) undoStack.shift();
+}
+function undo() {
+  if (!undoStack.length) { toast('没有可撤回的操作'); return; }
+  mind = undoStack.pop();
+  if (!findNode(mind, selectedId)) selectedId = mind.id;
+  render();
+}
+// 连续输入控件（文字/字号/颜色）：焦点时记快照，首次变更才入栈，避免每次按键都入栈
+let _editSnap = null, _editPushed = false;
+function beginEditSnap() { _editSnap = JSON.parse(JSON.stringify(mind)); _editPushed = false; }
+function commitEditSnap() { if (!_editPushed) { pushUndo(_editSnap); _editPushed = true; } }
+function endEditSnap() { _editSnap = null; _editPushed = false; }
+
 /* ---------- 增删改 ---------- */
 function addChild(id) {
   const node = findNode(mind, id); if (!node) return;
   node.collapsed = false;
-  const child = newNode(); node.children.push(child);
+  const child = newNode(); pushUndo(); node.children.push(child);
   selectedId = child.id; render();
 }
 function addSibling(id) {
   if (isRoot(id)) { addChild(id); return; }
   const parent = findParent(mind, id);
   const idx = parent.children.findIndex(c => c.id === id);
-  const sib = newNode(); parent.children.splice(idx + 1, 0, sib);
+  const sib = newNode(); pushUndo(); parent.children.splice(idx + 1, 0, sib);
   selectedId = sib.id; render();
 }
 function addParent(id) {
   const node = findNode(mind, id); if (!node) return;
-  const np = newNode();
+  const np = newNode(); pushUndo();
   if (isRoot(id)) { np.children = [mind]; mind = np; }
   else {
     const parent = findParent(mind, id);
@@ -148,11 +169,13 @@ function addParent(id) {
 function deleteNode(id) {
   if (isRoot(id)) {
     if (!confirm('确定要清空当前脑图的所有节点吗？')) return;
+    pushUndo();
     mind = { id: nid(), text: '中心主题', fontSize: 18, bold: true, color: '#ffffff', collapsed: false, children: [] };
     selectedId = mind.id; render(); return;
   }
   const parent = findParent(mind, id);
   const idx = parent.children.findIndex(c => c.id === id);
+  pushUndo();
   parent.children.splice(idx, 1);
   selectedId = parent.id; render();
 }
@@ -163,6 +186,7 @@ function moveNode(id, dir) {
   const i = arr.findIndex(c => c.id === id);
   const j = i + dir;
   if (j < 0 || j >= arr.length) return;
+  pushUndo();
   [arr[i], arr[j]] = [arr[j], arr[i]];
   render();
 }
@@ -180,6 +204,7 @@ function reparent(dragId, targetId) {
   if (isRoot(dragId)) { toast('根节点不能移动'); return; }
   if (isWithin(dragNode, targetId)) { toast('不能拖到自己的子节点上'); return; }
   const dp = findParent(mind, dragId);
+  pushUndo();
   dp.children.splice(dp.children.indexOf(dragNode), 1);
   target.collapsed = false;
   target.children.push(dragNode);
@@ -205,6 +230,7 @@ function pasteSubtree() {
   const target = findNode(mind, selectedId) || mind;
   const copy = deepClone(clipboard);
   target.collapsed = false;
+  pushUndo();
   target.children.push(copy);
   selectedId = copy.id;
   render();
@@ -367,7 +393,9 @@ function enterEdit(node, txtEl, divEl) {
   const finish = () => {
     txtEl.contentEditable = 'false';
     txtEl.classList.remove('editing');
-    node.text = (txtEl.textContent || '').trim() || '（空）';
+    const newText = (txtEl.textContent || '').trim() || '（空）';
+    if (newText !== node.text) { pushUndo(); node.text = newText; }
+    else { node.text = newText; }
     divEl.setAttribute('draggable', 'true');
     txtEl.removeEventListener('blur', finish);
     txtEl.removeEventListener('keydown', onKey);
@@ -486,20 +514,30 @@ function bindEvents() {
   document.getElementById('btnDelete').onclick = () => deleteNode(selectedId);
   document.getElementById('btnCopy').onclick = copySubtree;
   document.getElementById('btnPaste').onclick = pasteSubtree;
+  document.getElementById('btnUndo').onclick = undo;
 
   // 工具栏内输入框（作为内联编辑的补充）
-  document.getElementById('txtText').addEventListener('input', e => {
+  const txtTextEl = document.getElementById('txtText');
+  txtTextEl.addEventListener('focus', beginEditSnap);
+  txtTextEl.addEventListener('input', e => {
     const node = findNode(mind, selectedId);
-    if (node) { node.text = e.target.value; render(); }
+    if (node) { node.text = e.target.value; commitEditSnap(); render(); }
   });
-  document.getElementById('rngSize').addEventListener('input', e => {
+  txtTextEl.addEventListener('blur', endEditSnap);
+  const rngSizeEl = document.getElementById('rngSize');
+  rngSizeEl.addEventListener('focus', beginEditSnap);
+  rngSizeEl.addEventListener('input', e => {
     const node = findNode(mind, selectedId);
-    if (node) { node.fontSize = +e.target.value; document.getElementById('sizeVal').textContent = e.target.value; render(); }
+    if (node) { node.fontSize = +e.target.value; document.getElementById('sizeVal').textContent = e.target.value; commitEditSnap(); render(); }
   });
-  document.getElementById('btnBold').onclick = () => { const n = findNode(mind, selectedId); if (n) { n.bold = !n.bold; render(); } };
-  document.getElementById('colColor').addEventListener('input', e => {
-    const node = findNode(mind, selectedId); if (node) { node.color = e.target.value; render(); }
+  rngSizeEl.addEventListener('blur', endEditSnap);
+  document.getElementById('btnBold').onclick = () => { const n = findNode(mind, selectedId); if (n) { pushUndo(); n.bold = !n.bold; render(); } };
+  const colColorEl = document.getElementById('colColor');
+  colColorEl.addEventListener('focus', beginEditSnap);
+  colColorEl.addEventListener('input', e => {
+    const node = findNode(mind, selectedId); if (node) { node.color = e.target.value; commitEditSnap(); render(); }
   });
+  colColorEl.addEventListener('blur', endEditSnap);
 
   // 标题命名
   document.getElementById('txtTitle').addEventListener('input', e => {
@@ -567,6 +605,7 @@ function handleNav(action) {
     case 'exportJSON': exportJSON(); break;
     case 'reset':
       if (confirm('确定清空当前脑图的所有节点吗？')) {
+        pushUndo();
         mind = { id: nid(), text: '中心主题', fontSize: 18, bold: true, color: '#ffffff', collapsed: false, children: [] };
         selectedId = mind.id; render();
       }
@@ -596,6 +635,9 @@ const HELP_GROUPS = [
     { keys: ['双击'], desc: '编辑节点文字' },
     { keys: ['拖拽'], desc: '把节点拖到另一个节点上，设为它的子节点' },
     { keys: ['＋/－'], desc: '点击节点右侧圆点，折叠 / 展开子节点' },
+  ]},
+  { title: '其它', items: [
+    { keys: ['↶ 撤回'], desc: '撤销上一步操作（每点一次撤回一环）' },
   ]},
 ];
 function openHelp() {
