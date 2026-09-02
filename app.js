@@ -62,6 +62,7 @@ let selectedId = mind.id;
 let dragId = null;          // 拖拽中的节点 id
 let clipboard = null;       // 复制的子树（深拷贝）
 let undoStack = [];       // 撤回栈（保存 mind 历史快照）
+let redoStack = [];       // 重做栈（保存撤回后可重做的状态）
 let searchQuery = '';
 let wasSearching = false;
 let collapsedSnap = {};
@@ -73,6 +74,7 @@ function persistCurrent() { const m = getCurrentMap(); m.data = mind; m.updatedA
 function setCurrent(id) {
   if (id === currentId) return;
   undoStack.length = 0;
+  redoStack.length = 0;
   persistCurrent();
   currentId = id;
   mind = getCurrentMap().data;
@@ -84,6 +86,7 @@ function setCurrent(id) {
 }
 function newMap() {
   undoStack.length = 0;
+  redoStack.length = 0;
   persistCurrent();
   const m = { id: 'm' + Date.now(), title: '未命名脑图 ' + (maps.length + 1), data: defaultData(), updatedAt: Date.now() };
   maps.push(m); currentId = m.id; mind = m.data; selectedId = mind.id;
@@ -91,6 +94,7 @@ function newMap() {
 }
 function deleteMap(id) {
   undoStack.length = 0;
+  redoStack.length = 0;
   const idx = maps.findIndex(m => m.id === id);
   if (idx < 0) return;
   if (!confirm(`确定删除脑图「${maps[idx].title}」吗？此操作不可恢复。`)) return;
@@ -128,10 +132,19 @@ function isWithin(subtreeRoot, id) {
 function pushUndo(snap) {
   undoStack.push(snap || JSON.parse(JSON.stringify(mind)));
   if (undoStack.length > 60) undoStack.shift();
+  redoStack.length = 0;   // 新操作会使重做历史失效
 }
 function undo() {
   if (!undoStack.length) { toast('没有可撤回的操作'); return; }
+  redoStack.push(JSON.parse(JSON.stringify(mind)));   // 保存当前状态，供重做
   mind = undoStack.pop();
+  if (!findNode(mind, selectedId)) selectedId = mind.id;
+  render();
+}
+function redo() {
+  if (!redoStack.length) { toast('没有可重做的操作'); return; }
+  undoStack.push(JSON.parse(JSON.stringify(mind)));   // 保存当前状态，供再次撤回
+  mind = redoStack.pop();
   if (!findNode(mind, selectedId)) selectedId = mind.id;
   render();
 }
@@ -515,6 +528,7 @@ function bindEvents() {
   document.getElementById('btnCopy').onclick = copySubtree;
   document.getElementById('btnPaste').onclick = pasteSubtree;
   document.getElementById('btnUndo').onclick = undo;
+  document.getElementById('btnRedo').onclick = redo;
 
   // 工具栏内输入框（作为内联编辑的补充）
   const txtTextEl = document.getElementById('txtText');
@@ -571,6 +585,13 @@ function bindEvents() {
     if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
     // 操作说明弹窗打开时，不触发画布快捷键，避免误编辑
     if (document.getElementById('helpModal').classList.contains('open')) return;
+    // Ctrl/Cmd + Z 撤回；Ctrl/Cmd + Y 或 Ctrl/Cmd + Shift + Z 重做
+    if (e.ctrlKey || e.metaKey) {
+      const k = e.key.toLowerCase();
+      if (k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+      else if (k === 'y') { e.preventDefault(); redo(); }
+      return;
+    }
     if (e.key === 'Tab') { e.preventDefault(); addChild(selectedId); }
     else if (e.key === 'Enter') { e.preventDefault(); addSibling(selectedId); }
     else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteNode(selectedId); }
@@ -624,6 +645,8 @@ const HELP_GROUPS = [
     { keys: ['Backspace'], desc: '删除选中节点' },
     { keys: ['Alt', '↑'], desc: '上移节点' },
     { keys: ['Alt', '↓'], desc: '下移节点' },
+    { keys: ['Ctrl', 'Z'], desc: '撤回（等同「↶ 撤回」按钮）' },
+    { keys: ['Ctrl', 'Y'], desc: '重做（等同「↷ 重做」按钮）' },
   ]},
   { title: '节点编辑中', items: [
     { keys: ['Enter'], desc: '完成编辑' },
@@ -638,6 +661,7 @@ const HELP_GROUPS = [
   ]},
   { title: '其它', items: [
     { keys: ['↶ 撤回'], desc: '撤销上一步操作（每点一次撤回一环）' },
+    { keys: ['↷ 重做'], desc: '恢复上一次撤回的操作（每点一次往前一步）' },
   ]},
 ];
 function openHelp() {
